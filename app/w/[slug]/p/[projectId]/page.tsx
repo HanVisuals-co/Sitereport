@@ -57,6 +57,10 @@ export default async function ProjectPage(props: PageProps<"/w/[slug]/p/[project
         </div>
       </div>
 
+      <Link href={`/w/${slug}/p/${project.id}/reports`} className={buttonClass("primary", "sm:self-start")}>
+        Laporan harian
+      </Link>
+
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">Pengaturan</h2>
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">

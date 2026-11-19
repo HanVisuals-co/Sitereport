@@ -124,13 +124,27 @@ await err("pengawas cannot create project", () => as(U.pengawas,
 const labor = (await ok("pelaksana adds master item", () => as(U.pelaksana,
   `insert into public.master_items (project_id, kind, name) values ($1,'labor','Tukang') returning id`, [proj]))).rows[0].id;
 
-await err("pengawas cannot create report", () => as(U.pengawas,
-  `insert into public.reports (project_id, author_id, period_start, period_end) values ($1,$2,'2026-11-19','2026-11-19')`, [proj, U.pengawas]));
-await err("pelaksana cannot insert status approved", () => as(U.pelaksana,
-  `insert into public.reports (project_id, author_id, period_start, period_end, status) values ($1,$2,'2026-11-18','2026-11-18','approved')`, [proj, U.pelaksana]));
-const rep = (await ok("pelaksana creates draft", () => as(U.pelaksana,
-  `insert into public.reports (project_id, author_id, period_start, period_end, notes_raw) values ($1,$2,'2026-11-19','2026-11-19','cor kolom') returning id`,
-  [proj, U.pelaksana]))).rows[0].id;
+const TODAY = `(now() at time zone 'Asia/Jakarta')::date`;
+await err("pengawas cannot start report", () => as(U.pengawas,
+  `select public.start_report($1, ${TODAY})`, [proj]));
+await err("direct insert into reports blocked", () => as(U.pelaksana,
+  `insert into public.reports (project_id, author_id, period_start, period_end) values ($1,$2,'2026-11-18','2026-11-18')`, [proj, U.pelaksana]));
+await err("future date rejected", () => as(U.pelaksana,
+  `select public.start_report($1, ${TODAY} + 1)`, [proj]));
+await err("beyond backdate limit rejected", () => as(U.pelaksana,
+  `select public.start_report($1, ${TODAY} - 3)`, [proj]));
+const rep = (await ok("pelaksana starts draft", () => as(U.pelaksana,
+  `select public.start_report($1, ${TODAY}) as id`, [proj]))).rows[0].id;
+await ok("start_report is idempotent", () => as(U.pelaksana,
+  `select public.start_report($1, ${TODAY}) as id`, [proj]), (r) => r.rows[0].id === rep);
+await ok("backdate within limit allowed", () => as(U.pelaksana,
+  `select public.start_report($1, ${TODAY} - 2) as id`, [proj]), (r) => !!r.rows[0].id);
+await ok("admin unlocks old date", async () => {
+  await as(U.admin, `select public.unlock_backdate($1, $2, ${TODAY} - 10)`, [proj, U.pelaksana]);
+  return as(U.pelaksana, `select public.start_report($1, ${TODAY} - 10) as id`, [proj]);
+}, (r) => !!r.rows[0].id);
+// Bersihkan draft tambahan supaya tes di bawah hanya melihat satu laporan.
+await db.query(`delete from public.reports where id <> $1`, [rep]);
 
 await ok("pelaksana adds labor", () => as(U.pelaksana,
   `insert into public.report_labor (report_id, master_item_id, count) values ($1,$2,5)`, [rep, labor]));
@@ -305,6 +319,82 @@ await ok("admin clears BOQ", async () => {
   await as(U.admin, `select public.clear_boq($1)`, [proj2]);
   return db.query(`select count(*)::int c from public.boq_items where project_id=$1`, [proj2]);
 }, (r) => r.rows[0].c === 0);
+
+// ---- Alur laporan: draft, submit, duplikat, review, kunci ----
+const weather = [
+  { slot: "pagi", condition: "cerah" },
+  { slot: "siang", condition: "berawan" },
+  { slot: "sore", condition: "hujan", rain_hours: 1.5 },
+];
+const photo = (reportId, sha) =>
+  `insert into public.report_photos (report_id, storage_path, sha256, source, size_bytes)
+   values ('${reportId}', '${ws}/${proj}/${reportId}/${sha.slice(0, 8)}.webp', '${sha}', 'camera', 1000)`;
+
+await ok("pelaksana saves draft", () => as(U.pelaksana, `select public.save_report_draft($1, $2::jsonb)`, [rep,
+  JSON.stringify({ notes_raw: "cor kolom", weather, labor: [{ master_item_id: labor, count: 5 }], volumes: [{ boq_item_id: item, volume: 12.5 }] })]));
+await ok("draft saved children", () => as(U.pelaksana,
+  `select (select count(*)::int from public.report_weather where report_id=$1) w,
+          (select rain_hours::float from public.report_weather where report_id=$1 and slot='sore') rh,
+          (select volume::float from public.report_volumes where report_id=$1) v`, [rep]),
+  (r) => r.rows[0].w === 3 && r.rows[0].rh === 1.5 && r.rows[0].v === 12.5);
+await err("volume on group item rejected", () => as(U.pelaksana, `select public.save_report_draft($1, $2::jsonb)`, [rep,
+  JSON.stringify({ weather, volumes: [{ boq_item_id: div, volume: 1 }] })]));
+await err("pengawas cannot save other's draft", () => as(U.pengawas, `select public.save_report_draft($1, '{}'::jsonb)`, [rep]));
+await err("submit without photo rejected", () => as(U.pelaksana, `select public.submit_report($1)`, [rep]));
+await ok("pelaksana adds photo row", () => as(U.pelaksana, photo(rep, "a".repeat(64))));
+await ok("submit ok, no duplicates", () => as(U.pelaksana, `select public.submit_report($1) as r`, [rep]),
+  (r) => r.rows[0].r.duplicates === 0);
+await ok("pengawas notified of submit", () => db.query(
+  `select count(*)::int c from public.notifications where type='report_submitted'`), (r) => r.rows[0].c >= 1);
+await err("pelaksana cannot edit submitted", () => as(U.pelaksana, `select public.save_report_draft($1, '{}'::jsonb)`, [rep]));
+
+const rep2 = (await as(U.pelaksana2, `select public.start_report($1, ${TODAY}) as id`, [proj])).rows[0].id;
+await as(U.pelaksana2, `select public.save_report_draft($1, $2::jsonb)`, [rep2,
+  JSON.stringify({ weather, volumes: [{ boq_item_id: item, volume: 12.6 }] })]);
+await as(U.pelaksana2, photo(rep2, "a".repeat(64)));
+await ok("second report flags volume (≤1%) and photo duplicates", () =>
+  as(U.pelaksana2, `select public.submit_report($1) as r`, [rep2]), (r) => r.rows[0].r.duplicates === 2);
+await err("pelaksana cannot approve", () => as(U.pelaksana, `select public.approve_report($1)`, [rep2]));
+await err("approve blocked while duplicates unresolved", () => as(U.pengawas, `select public.approve_report($1)`, [rep2]));
+await ok("pengawas resolves volume as valid", () => as(U.pengawas,
+  `select public.resolve_duplicate($1, 'volume', $2, 'valid')`, [rep2, item]));
+const dupPhoto = (await db.query(`select id from public.report_photos where report_id=$1`, [rep2])).rows[0].id;
+await ok("pengawas marks photo duplicate", () => as(U.pengawas,
+  `select public.resolve_duplicate($1, 'photo', $2, 'duplicate')`, [rep2, dupPhoto]));
+await err("approve blocked when something is duplicate", () => as(U.pengawas, `select public.approve_report($1)`, [rep2]));
+await err("revision needs a note", () => as(U.pengawas, `select public.request_revision($1, '')`, [rep2]));
+await ok("pengawas requests revision with section comment", () => as(U.pengawas,
+  `select public.request_revision($1, 'Foto sama dengan laporan lain', $2::jsonb)`,
+  [rep2, JSON.stringify([{ section: "foto", comment: "Ganti foto" }])]));
+await ok("revision comment stored and visible to author", () => as(U.pelaksana2,
+  `select c.section from public.report_review_comments c join public.report_reviews r on r.id = c.review_id where r.report_id=$1`, [rep2]),
+  (r) => r.rows[0]?.section === "foto");
+await ok("author fixes photo and resubmits", async () => {
+  await as(U.pelaksana2, `delete from public.report_photos where report_id=$1`, [rep2]);
+  await as(U.pelaksana2, photo(rep2, "b".repeat(64)));
+  return as(U.pelaksana2, `select public.submit_report($1) as r`, [rep2]);
+}, (r) => r.rows[0].r.duplicates === 1);
+await ok("pengawas resolves and approves", async () => {
+  await as(U.pengawas, `select public.resolve_duplicate($1, 'volume', $2, 'valid')`, [rep2, item]);
+  await as(U.pengawas, `select public.approve_report($1, 'OK')`, [rep2]);
+  return db.query(`select status, approved_by from public.reports where id=$1`, [rep2]);
+}, (r) => r.rows[0].status === "approved" && r.rows[0].approved_by === U.pengawas);
+await err("approved report locked for author", () => as(U.pelaksana2, `select public.save_report_draft($1, '{}'::jsonb)`, [rep2]));
+await err("approved report locked even for superuser update", () =>
+  db.query(`update public.reports set notes_raw='x' where id=$1`, [rep2]));
+await err("approved children locked", () => db.query(`delete from public.report_volumes where report_id=$1`, [rep2]));
+await err("pengawas cannot reopen", () => as(U.pengawas, `select public.reopen_report($1, 'salah')`, [rep2]));
+await ok("admin reopens with reason", async () => {
+  await as(U.admin, `select public.reopen_report($1, 'volume salah ketik')`, [rep2]);
+  return db.query(`select status from public.reports where id=$1`, [rep2]);
+}, (r) => r.rows[0].status === "revision_requested");
+await ok("author notified of approve, revision, reopen", () => db.query(
+  `select array_agg(distinct type order by type) t from public.notifications where user_id=$1`, [U.pelaksana2]),
+  (r) => ["report_approved", "report_reopened", "revision_requested"].every((t) => r.rows[0].t.includes(t)));
+await ok("first report approved by another pengawas", async () => {
+  await as(INV, `select public.approve_report($1)`, [rep]);
+  return db.query(`select status from public.reports where id=$1`, [rep]);
+}, (r) => r.rows[0].status === "approved");
 
 // ---- Integritas hapus ----
 await err("admin cannot delete BOQ item that has volumes", () => as(U.admin,
