@@ -47,7 +47,7 @@ Aturan:
 
 ### v1.0 (MVP)
 1. Workspace, proyek, anggota, undangan, kode proyek.
-2. BOQ: import template `.xlsx` + edit manual.
+2. BOQ: import langsung dari file RAB `.xlsx` + edit manual.
 3. Daftar master per proyek: kategori tenaga kerja, alat, material.
 4. Form laporan + foto (timestamp, GPS, sumber kamera/galeri).
 5. Alur maker-checker + flag duplikat.
@@ -79,11 +79,17 @@ Pengaturan per proyek (diatur Admin):
 - Status `active` / `archived`.
 
 ### 6.2 BOQ
-- Struktur bertingkat maksimal 3 level: Divisi > Sub-pekerjaan > Item. Volume dan satuan hanya ada di item level terbawah.
+- Struktur bertingkat maksimal 6 level, mengikuti RAB asli (mis. Disiplin > Lantai > Pekerjaan > Item; MEP: I > A > A.1 > Item). Volume dan satuan hanya ada di item terbawah. Item boleh punya spesifikasi (mis. "mutu f'c 25 Mpa").
 - Field item: kode, uraian, satuan, volume kontrak, harga satuan (opsional), bobot %.
 - **Bobot**: dihitung otomatis dari nilai (harga satuan × volume) kalau harga diisi. Kalau tidak, bobot diisi manual.
 - **Harga satuan hanya terlihat oleh Admin.**
-- Masuk lewat template `.xlsx` SiteReport (unduh, isi, upload) atau editor manual.
+- Masuk lewat import file RAB `.xlsx` apa adanya, atau editor manual:
+  - File dibaca di browser; hanya sheet yang dipilih yang dibuka (file RAB bisa berisi puluhan sheet AHSP dan ratusan external link).
+  - Beberapa sheet (mis. `rab str`, `rab ars`, `I.AB`) digabung jadi satu BOQ; tiap sheet menjadi grup teratas.
+  - Header dan kolom (uraian, volume, satuan, harga satuan, jumlah) dideteksi otomatis per sheet dan bisa dikoreksi Admin.
+  - Baris subtotal/PPN/total diabaikan. Total dihitung ulang dari volume × harga satuan; baris yang jumlahnya di file tidak cocok diberi peringatan.
+  - Preview pohon + peringatan (volume/harga kosong, jumlah tidak cocok) sebelum disimpan. Maksimal 5.000 baris per import.
+  - Import ulang menimpa BOQ lama, hanya selama BOQ belum dipakai laporan.
 - Admin boleh menambah item dan mengubah volume di tengah proyek. Semua perubahan masuk audit log. Belum ada alur CCO formal.
 - Laporan baru bisa dibuat setelah proyek punya BOQ.
 

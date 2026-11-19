@@ -232,6 +232,80 @@ await err("anon cannot call rpc", async () => {
   }
 });
 
+// ---- BOQ: import, bobot, spesifikasi ----
+await ok("price change recalculates weight (single leaf = 100%)", () =>
+  as(U.admin, `select weight_pct from public.boq_items where id=$1`, [item]),
+  (r) => Number(r.rows[0]?.weight_pct) === 100);
+await ok("group has no weight", () => as(U.admin, `select weight_pct from public.boq_items where id=$1`, [div]),
+  (r) => r.rows[0]?.weight_pct === null);
+await err("import refused when BOQ used by reports", () => as(U.admin,
+  `select public.import_boq($1, '[{"key":"a","level":1,"name":"X"}]'::jsonb, true)`, [proj]));
+await err("import refused without replace", () => as(U.admin,
+  `select public.import_boq($1, '[{"key":"a","level":1,"name":"X"}]'::jsonb, false)`, [proj]));
+
+const proj2 = (await as(U.admin, `insert into public.projects (workspace_id, name) values ($1,'Gedung Y') returning id`, [ws])).rows[0].id;
+await as(U.admin, `insert into public.project_members (project_id, user_id, role) values ($1,$2,'pelaksana')`, [proj2, U.pelaksana]);
+const items = [
+  { key: "s", level: 1, name: "PEKERJAAN STRUKTUR" },
+  { key: "s1", parent_key: "s", level: 2, code: "I.", name: "Persiapan" },
+  { key: "s1a", parent_key: "s1", level: 3, code: "a.", name: "Tanah" },
+  { key: "s1a1", parent_key: "s1a", level: 4, code: "1", name: "galian", unit: "m3", volume: 100, unit_price: 30000 },
+  { key: "s1a2", parent_key: "s1a", level: 4, code: "2", name: "rabat beton", spec: "mutu f'c = 7,4 Mpa", unit: "m3", volume: 10, unit_price: 100000 },
+  { key: "a", level: 1, name: "PEKERJAAN ARSITEKTUR" },
+  { key: "a1", parent_key: "a", level: 2, code: "1", name: "fitting", unit: "lot", volume: 1, unit_price: 0 },
+  { key: "a2", parent_key: "a", level: 2, code: "2", name: "tanpa harga", unit: "unit", volume: 2 },
+];
+await err("pelaksana cannot import", () => as(U.pelaksana,
+  `select public.import_boq($1, $2::jsonb)`, [proj2, JSON.stringify(items)]));
+await err("bad parent order rejected", () => as(U.admin,
+  `select public.import_boq($1, $2::jsonb)`, [proj2, JSON.stringify([items[1]])]));
+await ok("admin imports BOQ", () => as(U.admin,
+  `select public.import_boq($1, $2::jsonb) as n`, [proj2, JSON.stringify(items)]),
+  (r) => r.rows[0].n === 8);
+await ok("weights from price x volume", () => as(U.admin,
+  `select name, weight_pct::float as w from public.boq_items where project_id=$1 and weight_pct is not null order by sort_order`, [proj2]),
+  (r) => {
+    const w = Object.fromEntries(r.rows.map((x) => [x.name, x.w]));
+    return w.galian === 75 && w["rabat beton"] === 25 && w.fitting === 0 && w["tanpa harga"] === 0;
+  });
+await ok("spec stored", () => as(U.pelaksana, `select spec from public.boq_items where name='rabat beton'`),
+  (r) => r.rows[0]?.spec === "mutu f'c = 7,4 Mpa");
+await ok("pelaksana still cannot see imported prices", () => as(U.pelaksana,
+  `select * from public.boq_item_prices p join public.boq_items b on b.id = p.boq_item_id where b.project_id=$1`, [proj2]),
+  (r) => r.rows.length === 0);
+await ok("import audited as one row", () => db.query(
+  `select count(*)::int c from public.audit_log where project_id=$1 and entity='boq_items'`, [proj2]),
+  (r) => r.rows[0].c === 1);
+await ok("manual price edit recalculates", async () => {
+  await as(U.admin, `update public.boq_item_prices set unit_price = 90000
+    where boq_item_id = (select id from public.boq_items where name='rabat beton' and project_id=$1)`, [proj2]);
+  return as(U.admin, `select weight_pct::float w from public.boq_items where name='galian' and project_id=$1`, [proj2]);
+}, (r) => Math.abs(r.rows[0].w - 76.923077) < 0.0001);
+await ok("level 6 allowed", async () => {
+  let parent = null;
+  for (let lvl = 1; lvl <= 6; lvl++) {
+    const r = await as(U.admin, `insert into public.boq_items (project_id, parent_id, level, name) values ($1,$2,$3,'L') returning id`, [proj2, parent, lvl]);
+    parent = r.rows[0].id;
+  }
+  return { rows: [{ parent }] };
+}, (r) => !!r.rows[0].parent);
+await ok("add item under leaf turns it into group", async () => {
+  const leaf = (await as(U.admin, `select id from public.boq_items where project_id=$1 and name='galian'`, [proj2])).rows[0].id;
+  await as(U.admin, `select public.add_boq_item($1, $2, 'sub galian', '1.a', null, 'm3', 5, 1000)`, [proj2, leaf]);
+  return as(U.admin, `select b.name, b.level, b.unit, b.sort_order, (select count(*)::int from public.boq_item_prices p where p.boq_item_id=b.id) price
+    from public.boq_items b where project_id=$1 and name in ('galian','sub galian','rabat beton') order by sort_order`, [proj2]);
+}, (r) => r.rows.map((x) => x.name).join() === "galian,sub galian,rabat beton"
+  && r.rows[0].unit === null && r.rows[0].price === 0 && r.rows[1].level === 5);
+await err("pelaksana cannot add item", () => as(U.pelaksana,
+  `select public.add_boq_item($1, null, 'x')`, [proj2]));
+await ok("admin replaces BOQ", () => as(U.admin,
+  `select public.import_boq($1, $2::jsonb, true) as n`, [proj2, JSON.stringify(items.slice(0, 4))]),
+  (r) => r.rows[0].n === 4);
+await ok("admin clears BOQ", async () => {
+  await as(U.admin, `select public.clear_boq($1)`, [proj2]);
+  return db.query(`select count(*)::int c from public.boq_items where project_id=$1`, [proj2]);
+}, (r) => r.rows[0].c === 0);
+
 // ---- Integritas hapus ----
 await err("admin cannot delete BOQ item that has volumes", () => as(U.admin,
   `delete from public.boq_items where id=$1`, [item]));

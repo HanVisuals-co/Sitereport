@@ -106,7 +106,8 @@ create type weight_source  as enum ('auto', 'manual');
 
 **boq_items**
 - `project_id → projects`, `parent_id → boq_items null`
-- `level smallint check (level between 1 and 3)`
+- `level smallint check (level between 1 and 6)`
+- `spec text null` (keterangan teknis, mis. mutu beton)
 - `code text`, `name text`, `sort_order int`
 - `unit text null`, `contract_volume numeric null` (wajib diisi untuk item daun)
 - `weight_pct numeric null`, `weight_source weight_source`
