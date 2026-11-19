@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 
 import { env } from "@/lib/env";
 
@@ -8,6 +9,10 @@ import { env } from "@/lib/env";
  * Buat baru di setiap request; jangan disimpan di variabel global.
  */
 export async function createClient() {
+  // Klien auth Supabase memanggil Date.now() saat membaca sesi. Dengan Cache Components,
+  // itu tidak boleh terjadi saat prerender (termasuk runtime prefetch), jadi tandai
+  // rendering ini sebagai per-request dulu.
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient(env.supabaseUrl, env.supabasePublishableKey, {

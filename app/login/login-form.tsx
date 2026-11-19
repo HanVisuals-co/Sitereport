@@ -8,6 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 
 import { sendMagicLink, type MagicLinkState } from "./actions";
 
+// Tampilkan tombol Google hanya kalau provider Google sudah diaktifkan di Supabase.
+const GOOGLE_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
 export function LoginForm({ initialError, next }: { initialError?: string; next: string }) {
   const [state, action, pending] = useActionState<MagicLinkState, FormData>(sendMagicLink, {
     status: "idle",
@@ -47,20 +50,24 @@ export function LoginForm({ initialError, next }: { initialError?: string; next:
     <div className="flex flex-col gap-6">
       <FormError message={initialError ?? googleError} />
 
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={signInWithGoogle}
-        disabled={googlePending}
-      >
-        {googlePending ? "Mengalihkan..." : "Masuk dengan Google"}
-      </Button>
+      {GOOGLE_ENABLED && (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={signInWithGoogle}
+            disabled={googlePending}
+          >
+            {googlePending ? "Mengalihkan..." : "Masuk dengan Google"}
+          </Button>
 
-      <div className="flex items-center gap-3 text-sm text-zinc-500">
-        <span className="h-px flex-1 bg-zinc-300" />
-        atau
-        <span className="h-px flex-1 bg-zinc-300" />
-      </div>
+          <div className="flex items-center gap-3 text-sm text-zinc-500">
+            <span className="h-px flex-1 bg-zinc-300" />
+            atau
+            <span className="h-px flex-1 bg-zinc-300" />
+          </div>
+        </>
+      )}
 
       <form action={action} className="flex flex-col gap-4">
         <input type="hidden" name="next" value={next} />

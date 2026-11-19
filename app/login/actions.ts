@@ -32,9 +32,13 @@ export async function sendMagicLink(
   });
 
   if (error) {
+    console.error("signInWithOtp gagal:", error.status, error.code, error.message);
+    const rateLimited = error.status === 429 || /rate limit/i.test(error.code ?? error.message);
     return {
       status: "error",
-      message: "Gagal mengirim link masuk. Coba lagi sebentar lagi.",
+      message: rateLimited
+        ? "Terlalu banyak permintaan link masuk. Tunggu beberapa menit, lalu coba lagi. Link yang sudah terkirim sebelumnya masih bisa dipakai."
+        : "Gagal mengirim link masuk. Coba lagi sebentar lagi.",
       email: raw,
     };
   }

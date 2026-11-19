@@ -122,6 +122,8 @@ describe("parseSheet (format sipil)", () => {
 
   it("mengabaikan baris subtotal dan PPN", () => {
     expect(parsed.nodes.some((n) => /jumlah|ppn/i.test(n.name))).toBe(false);
+    // Teks ringkasan juga tidak boleh menempel sebagai spesifikasi item sebelumnya.
+    expect(parsed.nodes.some((n) => /jumlah|ppn/i.test(n.spec ?? ""))).toBe(false);
   });
 
   it("memberi peringatan untuk harga 0 dan jumlah yang tidak cocok", () => {

@@ -26,8 +26,8 @@ grant usage on schema storage to authenticated;
 grant all on storage.objects to authenticated;
 grant execute on function storage.foldername(text) to authenticated;
 grant usage on schema public to authenticated, anon;
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+-- Seperti project Supabase baru: TIDAK ada grant otomatis ke anon/authenticated.
+-- Migrasi harus memberi hak tabel secara eksplisit.
 `);
 
 for (const f of readdirSync(migDir).filter((f) => f.endsWith(".sql")).sort()) {
@@ -369,6 +369,20 @@ await ok("pengawas requests revision with section comment", () => as(U.pengawas,
 await ok("revision comment stored and visible to author", () => as(U.pelaksana2,
   `select c.section from public.report_review_comments c join public.report_reviews r on r.id = c.review_id where r.report_id=$1`, [rep2]),
   (r) => r.rows[0]?.section === "foto");
+// Jalur tulis langsung yang tidak boleh melewati pengecekan RPC (laporan masih bisa diedit di sini).
+await err("author cannot shift report period directly", () => as(U.pelaksana2,
+  `update public.reports set period_start = period_start + 30, period_end = period_end + 30 where id=$1`, [rep2]));
+await ok("author can still edit notes directly", () => as(U.pelaksana2,
+  `update public.reports set notes_raw = 'ok' where id=$1 returning id`, [rep2]), (r) => r.rows.length === 1);
+await err("direct volume on group BOQ item rejected", () => as(U.pelaksana2,
+  `insert into public.report_volumes (report_id, boq_item_id, volume) values ($1,$2,5)`, [rep2, div]));
+await err("photo row with foreign storage path rejected", () => as(U.pelaksana2,
+  `insert into public.report_photos (report_id, storage_path, sha256, source, size_bytes)
+   values ($1, 'other-ws/other-proj/other-report/x.webp', '${"c".repeat(64)}', 'camera', 1)`, [rep2]));
+await err("photo row in a subfolder of own report rejected", () => as(U.pelaksana2,
+  `insert into public.report_photos (report_id, storage_path, sha256, source, size_bytes)
+   values ($1, $2, '${"c".repeat(64)}', 'camera', 1)`, [rep2, `${ws}/${proj}/${rep2}/sub/x.webp`]));
+
 await ok("author fixes photo and resubmits", async () => {
   await as(U.pelaksana2, `delete from public.report_photos where report_id=$1`, [rep2]);
   await as(U.pelaksana2, photo(rep2, "b".repeat(64)));
@@ -395,6 +409,20 @@ await ok("first report approved by another pengawas", async () => {
   await as(INV, `select public.approve_report($1)`, [rep]);
   return db.query(`select status from public.reports where id=$1`, [rep]);
 }, (r) => r.rows[0].status === "approved");
+
+await ok("author promoted to pengawas cannot approve own report", async () => {
+  const own = (await as(U.outsider, `select public.start_report($1, ${TODAY}) as id`, [proj])).rows[0].id;
+  await as(U.outsider, `select public.save_report_draft($1, $2::jsonb)`, [own, JSON.stringify({ weather })]);
+  await as(U.outsider, photo(own, "d".repeat(64)));
+  await as(U.outsider, `select public.submit_report($1)`, [own]);
+  await as(U.admin, `update public.project_members set role='pengawas' where project_id=$1 and user_id=$2`, [proj, U.outsider]);
+  try {
+    await as(U.outsider, `select public.approve_report($1)`, [own]);
+    return { rows: [{ blocked: false }] };
+  } catch (e) {
+    return { rows: [{ blocked: /laporan sendiri/.test(e.message) }] };
+  }
+}, (r) => r.rows[0].blocked === true);
 
 // ---- Integritas hapus ----
 await err("admin cannot delete BOQ item that has volumes", () => as(U.admin,
