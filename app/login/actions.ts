@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { z } from "zod";
 
+import { safeNext } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/server";
 
 export type MagicLinkState =
@@ -23,10 +24,11 @@ export async function sendMagicLink(
   }
 
   const origin = (await headers()).get("origin") ?? "http://localhost:3000";
+  const next = safeNext(formData.get("next"));
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data,
-    options: { emailRedirectTo: `${origin}/auth/callback` },
+    options: { emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}` },
   });
 
   if (error) {

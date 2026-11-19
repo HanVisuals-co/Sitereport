@@ -101,17 +101,100 @@ export async function getProject(projectId: string): Promise<Project | null> {
   return data;
 }
 
-export async function countMembers(projectId: string): Promise<Record<ProjectRole, number>> {
+/** Jumlah anggota aktif per peran, plus permintaan bergabung yang menunggu. */
+export async function countMembers(
+  projectId: string,
+): Promise<Record<ProjectRole | "pending", number>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_members")
-    .select("role")
-    .eq("project_id", projectId)
-    .eq("status", "active");
+    .select("role, status")
+    .eq("project_id", projectId);
   if (error) throw error;
-  const counts: Record<ProjectRole, number> = { pengawas: 0, pelaksana: 0, viewer: 0 };
-  for (const row of data as { role: ProjectRole }[]) counts[row.role]++;
+  const counts = { pengawas: 0, pelaksana: 0, viewer: 0, pending: 0 };
+  for (const row of data as { role: ProjectRole; status: MemberStatus }[]) {
+    if (row.status === "pending") counts.pending++;
+    else counts[row.role]++;
+  }
   return counts;
+}
+
+export type MemberStatus = "pending" | "active";
+
+export type ProjectMember = {
+  user_id: string;
+  role: ProjectRole;
+  status: MemberStatus;
+  created_at: string;
+  profile: { full_name: string | null; email: string | null } | null;
+};
+
+/** Semua anggota proyek (aktif dan pending). Pending hanya terlihat oleh Admin. */
+export async function listProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select(
+      "user_id, role, status, created_at, profile:profiles!project_members_user_id_fkey(full_name, email)",
+    )
+    .eq("project_id", projectId)
+    .order("created_at");
+  if (error) throw error;
+  return data as unknown as ProjectMember[];
+}
+
+export type ProjectInvite = {
+  id: string;
+  role: ProjectRole;
+  expires_at: string;
+  max_uses: number | null;
+  used_count: number;
+  created_at: string;
+};
+
+/** Undangan yang masih berlaku (belum dicabut, belum kedaluwarsa, kuota belum habis). */
+export async function listActiveInvites(projectId: string): Promise<ProjectInvite[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_invites")
+    .select("id, role, expires_at, max_uses, used_count, created_at")
+    .eq("project_id", projectId)
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ProjectInvite[]).filter((i) => i.max_uses === null || i.used_count < i.max_uses);
+}
+
+export type PendingJoinRequest = {
+  project_name: string;
+  workspace_name: string;
+  requested_at: string;
+};
+
+export async function listMyPendingRequests(): Promise<PendingJoinRequest[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_pending_join_requests");
+  if (error) throw error;
+  return data as PendingJoinRequest[];
+}
+
+/** Slug workspace dari sebuah proyek yang bisa dibaca user. */
+export async function getProjectWorkspaceSlug(projectId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("workspace:workspaces(slug)")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as unknown as { workspace: { slug: string } } | null)?.workspace.slug ?? null;
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
 }
 
 export const ROLE_LABEL: Record<ProjectRole, string> = {

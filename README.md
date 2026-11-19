@@ -30,6 +30,7 @@ npm run dev
 |---|---|
 | `npm run db:reset` | Terapkan ulang semua migrasi dari nol |
 | `npm run db:test` | Jalankan test pgTAP di `supabase/tests` |
+| `npm run db:check` | Cek cepat migrasi + RLS tanpa Docker (PGlite, stub auth/storage) |
 | `npm run db:types` | Generate tipe TypeScript dari skema lokal |
 
 Migrasi ada di `supabase/migrations`. Jangan ubah migrasi yang sudah diterapkan di Supabase Cloud; buat file migrasi baru.

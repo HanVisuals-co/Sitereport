@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { buttonClass } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
-import { listAdminWorkspaces, listMemberships, ROLE_LABEL } from "@/lib/data";
+import {
+  listAdminWorkspaces,
+  listMemberships,
+  listMyPendingRequests,
+  ROLE_LABEL,
+} from "@/lib/data";
 
 // Membaca sesi di level atas, jadi route ini boleh blocking.
 // Lihat docs Next: guides/authentication-with-cache-components.
@@ -12,13 +17,14 @@ export const instant = false;
 
 export default async function Home() {
   const user = await requireUser();
-  const [workspaces, memberships] = await Promise.all([
+  const [workspaces, memberships, pendingRequests] = await Promise.all([
     listAdminWorkspaces(user.id),
     listMemberships(user.id),
+    listMyPendingRequests(),
   ]);
 
   // Kasus paling umum: Admin dari satu workspace saja.
-  if (workspaces.length === 1 && memberships.length === 0) {
+  if (workspaces.length === 1 && memberships.length === 0 && pendingRequests.length === 0) {
     redirect(`/w/${workspaces[0].slug}`);
   }
 
@@ -28,19 +34,35 @@ export default async function Home() {
     <>
       <AppHeader title="SiteReport" email={user.email} />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8">
+        {pendingRequests.length > 0 && (
+          <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+            <h2 className="font-semibold">Menunggu persetujuan Admin</h2>
+            <ul className="mt-1 text-sm text-zinc-700">
+              {pendingRequests.map((r) => (
+                <li key={`${r.workspace_name}-${r.project_name}-${r.requested_at}`}>
+                  {r.project_name} · {r.workspace_name}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {isNew ? (
           <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h1 className="text-2xl font-semibold">Selamat datang</h1>
             <p className="mt-1 text-zinc-600">
               Kamu belum tergabung di workspace atau proyek mana pun.
             </p>
-            <div className="mt-6">
-              <Link href="/onboarding" className={buttonClass("primary")}>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link href="/join" className={buttonClass("primary")}>
+                Gabung dengan kode proyek
+              </Link>
+              <Link href="/onboarding" className={buttonClass("secondary")}>
                 Buat workspace perusahaan
               </Link>
             </div>
             <p className="mt-4 text-sm text-zinc-600">
-              Diundang ke proyek? Buka link undangan dari Admin proyekmu.
+              Punya link undangan? Buka link itu langsung dari pesan Admin proyekmu.
             </p>
           </section>
         ) : (
@@ -89,6 +111,13 @@ export default async function Home() {
                 </ul>
               </section>
             )}
+
+            <p className="text-sm text-zinc-600">
+              Diberi kode proyek baru?{" "}
+              <Link href="/join" className="font-medium text-zinc-900 underline">
+                Gabung dengan kode
+              </Link>
+            </p>
           </>
         )}
       </main>

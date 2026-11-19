@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 import { sendMagicLink, type MagicLinkState } from "./actions";
 
-export function LoginForm({ initialError }: { initialError?: string }) {
+export function LoginForm({ initialError, next }: { initialError?: string; next: string }) {
   const [state, action, pending] = useActionState<MagicLinkState, FormData>(sendMagicLink, {
     status: "idle",
   });
@@ -21,7 +21,9 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
     });
     if (error) {
       setGooglePending(false);
@@ -61,6 +63,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       </div>
 
       <form action={action} className="flex flex-col gap-4">
+        <input type="hidden" name="next" value={next} />
         <TextField
           label="Email"
           name="email"

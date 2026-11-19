@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { buttonClass } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
-import { countMembers, getProject, getWorkspace, TIMEZONE_LABEL } from "@/lib/data";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { countMembers, getProject, getWorkspace, isUuid, TIMEZONE_LABEL } from "@/lib/data";
 
 function formatDate(d: string | null) {
   if (!d) return "—";
@@ -15,13 +14,14 @@ function formatDate(d: string | null) {
 
 export default async function ProjectPage(props: PageProps<"/w/[slug]/p/[projectId]">) {
   const { slug, projectId } = await props.params;
-  if (!UUID.test(projectId)) notFound();
+  if (!isUuid(projectId)) notFound();
 
   const user = await requireUser();
   const [ws, project] = await Promise.all([getWorkspace(slug, user.id), getProject(projectId)]);
   if (!ws || !project || project.workspace_id !== ws.workspace.id) notFound();
 
   const members = await countMembers(project.id);
+  const pendingCount = members.pending;
 
   const settings: [string, string][] = [
     ["Kode", project.code ?? "—"],
@@ -69,11 +69,19 @@ export default async function ProjectPage(props: PageProps<"/w/[slug]/p/[project
           {members.pengawas} Pengawas · {members.pelaksana} Pelaksana
         </p>
         {ws.isAdmin && (
-          <p className="mt-3 text-sm text-zinc-600">
-            Kode proyek: <span className="font-mono font-semibold">{project.join_code}</span>
-            <br />
-            Undangan anggota dan persetujuan kode proyek menyusul di tahap berikutnya.
-          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link
+              href={`/w/${slug}/p/${project.id}/members`}
+              className={buttonClass("secondary")}
+            >
+              Kelola anggota
+            </Link>
+            {pendingCount > 0 && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900">
+                {pendingCount} permintaan bergabung
+              </span>
+            )}
+          </div>
         )}
       </section>
 

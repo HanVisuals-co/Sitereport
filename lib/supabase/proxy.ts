@@ -43,6 +43,10 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
+    // Bawa tujuan awal supaya user kembali ke sana setelah login (mis. link undangan).
+    if (request.nextUrl.pathname !== "/") {
+      url.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
+    }
     const redirect = NextResponse.redirect(url);
     // Bawa cookie yang mungkin baru saja diperbarui/dihapus.
     for (const cookie of response.cookies.getAll()) {
