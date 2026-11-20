@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { SmallSubmit } from "@/components/ui/confirm-submit";
 import { requireUser } from "@/lib/auth/session";
 import { getProject, getWorkspace, isUuid } from "@/lib/data";
@@ -29,9 +29,7 @@ export default async function MasterPage(props: PageProps<"/w/[slug]/p/[projectI
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href={`/w/${slug}/p/${project.id}`} className="text-sm text-zinc-600 hover:underline">
-            ← {project.name}
-          </Link>
+          <BackLink href={`/w/${slug}/p/${project.id}`}>{project.name}</BackLink>
           <h1 className="mt-2 text-2xl font-semibold">Daftar master</h1>
           <p className="text-zinc-600">
             Pilihan tenaga kerja, alat, dan material di form laporan harian. Pelaksana juga bisa

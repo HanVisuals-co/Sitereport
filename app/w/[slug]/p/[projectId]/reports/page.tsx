@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { countBoqItems } from "@/lib/boq/data";
 import { getProject, getWorkspace, isUuid } from "@/lib/data";
@@ -43,9 +44,7 @@ export default async function ReportsPage(props: PageProps<"/w/[slug]/p/[project
   return (
     <>
       <div>
-        <Link href={`/w/${slug}/p/${project.id}`} className="text-sm text-zinc-600 hover:underline">
-          ← {project.name}
-        </Link>
+        <BackLink href={`/w/${slug}/p/${project.id}`}>{project.name}</BackLink>
         <h1 className="mt-2 text-2xl font-semibold">
           {isPelaksana ? "Laporan saya" : "Laporan masuk"}
         </h1>
@@ -91,7 +90,7 @@ export default async function ReportsPage(props: PageProps<"/w/[slug]/p/[project
               <li key={r.id}>
                 <Link
                   href={`/w/${slug}/p/${project.id}/reports/${r.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-zinc-50"
+                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-zinc-50 active:bg-zinc-100"
                 >
                   <div className="min-w-0">
                     <p className="font-medium">{formatPeriod(r.period_start, r.period_end)}</p>

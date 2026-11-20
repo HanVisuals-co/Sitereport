@@ -46,7 +46,7 @@ export default async function WorkspacePage(props: PageProps<"/w/[slug]">) {
             <li key={p.id}>
               <Link
                 href={`/w/${workspace.slug}/p/${p.id}`}
-                className="flex h-full flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-400"
+                className="flex h-full flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-400 active:scale-[0.99] active:bg-zinc-100"
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-medium">{p.name}</span>

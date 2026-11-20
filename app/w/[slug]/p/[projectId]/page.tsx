@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
 import { countBoqItems } from "@/lib/boq/data";
@@ -49,9 +50,7 @@ export default async function ProjectPage(props: PageProps<"/w/[slug]/p/[project
   return (
     <>
       <div>
-        <Link href={`/w/${slug}`} className="text-sm text-zinc-600 hover:underline">
-          ← Semua proyek
-        </Link>
+        <BackLink href={`/w/${slug}`}>Semua proyek</BackLink>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold">{project.name}</h1>
           {project.status === "archived" && (

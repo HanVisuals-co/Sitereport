@@ -725,7 +725,7 @@ function BoqPicker({
                   onPick(l.id);
                   setQ("");
                 }}
-                className="w-full border-b border-zinc-100 px-3 py-2 text-left hover:bg-zinc-50"
+                className="w-full border-b border-zinc-100 px-3 py-2 text-left hover:bg-zinc-50 active:bg-zinc-100"
               >
                 <span className="block text-xs text-zinc-500">{l.path}</span>
                 <span className="font-medium">

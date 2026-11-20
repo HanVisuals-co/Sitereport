@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
 import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 import { requireUser } from "@/lib/auth/session";
@@ -34,9 +35,7 @@ export default async function BoqPage(props: PageProps<"/w/[slug]/p/[projectId]/
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href={`/w/${slug}/p/${project.id}`} className="text-sm text-zinc-600 hover:underline">
-            ← {project.name}
-          </Link>
+          <BackLink href={`/w/${slug}/p/${project.id}`}>{project.name}</BackLink>
           <h1 className="mt-2 text-2xl font-semibold">BOQ</h1>
           <p className="text-zinc-600">
             {items.length === 0

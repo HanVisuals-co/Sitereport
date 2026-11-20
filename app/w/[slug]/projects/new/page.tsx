@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getWorkspace } from "@/lib/data";
 
@@ -21,9 +21,7 @@ export default async function NewProjectPage(props: PageProps<"/w/[slug]/project
   return (
     <>
       <div>
-        <Link href={`/w/${slug}`} className="text-sm text-zinc-600 hover:underline">
-          ← Kembali ke daftar proyek
-        </Link>
+        <BackLink href={`/w/${slug}`}>Kembali ke daftar proyek</BackLink>
         <h1 className="mt-2 text-2xl font-semibold">Proyek baru</h1>
       </div>
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">

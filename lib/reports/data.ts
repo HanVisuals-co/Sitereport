@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { listBoqItems } from "@/lib/boq/data";
 import type { ProjectRole } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +26,7 @@ export type ReportSummary = {
   author: { full_name: string | null; email: string | null } | null;
 };
 
-export async function getMyRole(projectId: string, userId: string): Promise<ProjectRole | null> {
+async function getMyRoleUncached(projectId: string, userId: string): Promise<ProjectRole | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_members")
@@ -169,3 +171,6 @@ export async function listBoqLeaves(projectId: string): Promise<BoqLeaf[]> {
 export function todayIn(timezone: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
 }
+
+/** Dipanggil berkali-kali per request (layout + halaman); hasilnya dibagi lewat cache(). */
+export const getMyRole = cache(getMyRoleUncached);

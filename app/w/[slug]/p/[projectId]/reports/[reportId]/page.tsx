@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { getProject, getWorkspace, isUuid } from "@/lib/data";
 import { listMasterItems } from "@/lib/master/data";
@@ -61,9 +61,7 @@ export default async function ReportPage(
   return (
     <>
       <div>
-        <Link href={`/w/${slug}/p/${project.id}/reports`} className="text-sm text-zinc-600 hover:underline">
-          ← Laporan {project.name}
-        </Link>
+        <BackLink href={`/w/${slug}/p/${project.id}/reports`}>Laporan {project.name}</BackLink>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold">{formatPeriod(report.period_start, report.period_end)}</h1>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_CLASS[report.status]}`}>

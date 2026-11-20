@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { requireUser } from "@/lib/auth/session";
 import { countBoqItems, isBoqUsed } from "@/lib/boq/data";
 import { getProject, getWorkspace, isUuid } from "@/lib/data";
@@ -28,9 +28,7 @@ export default async function BoqImportPage(
   return (
     <>
       <div>
-        <Link href={`/w/${slug}/p/${project.id}/boq`} className="text-sm text-zinc-600 hover:underline">
-          ← BOQ {project.name}
-        </Link>
+        <BackLink href={`/w/${slug}/p/${project.id}/boq`}>BOQ {project.name}</BackLink>
         <h1 className="mt-2 text-2xl font-semibold">Import BOQ dari Excel</h1>
         <p className="text-zinc-600">
           Pilih file RAB (.xlsx). File dibaca di perangkatmu; yang dikirim ke server hanya item

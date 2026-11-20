@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 export type SessionUser = { id: string; email: string | null };
 
 /** User yang sedang login, atau null. JWT diverifikasi lewat getClaims(). */
-export async function getUser(): Promise<SessionUser | null> {
+async function getUserUncached(): Promise<SessionUser | null> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;
@@ -21,3 +23,6 @@ export async function requireUser(): Promise<SessionUser> {
   if (!user) redirect("/login");
   return user;
 }
+
+/** Dipanggil berkali-kali per request (layout + halaman); hasilnya dibagi lewat cache(). */
+export const getUser = cache(getUserUncached);

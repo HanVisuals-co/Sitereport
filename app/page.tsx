@@ -80,7 +80,7 @@ export default async function Home() {
                     <li key={w.id}>
                       <Link
                         href={`/w/${w.slug}`}
-                        className="block rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-400"
+                        className="block rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-400 active:scale-[0.99] active:bg-zinc-100"
                       >
                         <span className="font-medium">{w.name}</span>
                         <span className="block font-mono text-sm text-zinc-500">/w/{w.slug}</span>
@@ -99,7 +99,7 @@ export default async function Home() {
                     <li key={m.project.id}>
                       <Link
                         href={`/w/${m.project.workspace.slug}/p/${m.project.id}`}
-                        className="block rounded-xl border border-zinc-200 bg-white p-4 hover:border-zinc-400"
+                        className="block rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-400 active:scale-[0.99] active:bg-zinc-100"
                       >
                         <span className="font-medium">{m.project.name}</span>
                         <span className="block text-sm text-zinc-500">

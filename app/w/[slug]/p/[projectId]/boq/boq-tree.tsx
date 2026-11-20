@@ -133,9 +133,15 @@ export function BoqTree({ items, prices, isAdmin, slug, projectId }: Props) {
     const kids = children.get(it.id);
     if (!kids?.length) return renderLeaf(it);
     return (
-      <details key={it.id} open={it.level <= 2} className="group border-b border-zinc-100">
-        <summary className="flex cursor-pointer list-none items-center gap-2 py-2 marker:hidden">
-          <span className="text-zinc-400 transition-transform group-open:rotate-90">▸</span>
+      <details key={it.id} className="border-b border-zinc-100 [&[open]>summary>svg]:rotate-90">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-lg py-2 marker:hidden active:bg-zinc-100 [&::-webkit-details-marker]:hidden">
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            className="size-5 shrink-0 text-zinc-500 transition-transform"
+          >
+            <path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
           <span className={`min-w-0 flex-1 ${it.level === 1 ? "font-semibold" : "font-medium"}`}>
             {it.code && <span className="mr-1.5 font-mono text-zinc-500">{it.code}</span>}
             {it.name}
@@ -201,6 +207,9 @@ export function BoqTree({ items, prices, isAdmin, slug, projectId }: Props) {
         )}
       </div>
 
+      {!q && roots.length > 0 && (
+        <p className="-mb-2 text-sm text-zinc-600">Ketuk nama grup untuk membuka atau menutup isinya.</p>
+      )}
       <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 shadow-sm">
         {q ? (
           matches.length === 0 ? (

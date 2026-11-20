@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { ConfirmSubmit, SmallSubmit } from "@/components/ui/confirm-submit";
 import { requireUser } from "@/lib/auth/session";
 import {
@@ -72,9 +72,7 @@ export default async function MembersPage(props: PageProps<"/w/[slug]/p/[project
   return (
     <>
       <div>
-        <Link href={`/w/${slug}/p/${project.id}`} className="text-sm text-zinc-600 hover:underline">
-          ← {project.name}
-        </Link>
+        <BackLink href={`/w/${slug}/p/${project.id}`}>{project.name}</BackLink>
         <h1 className="mt-2 text-2xl font-semibold">Anggota proyek</h1>
       </div>
 

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createClient } from "@/lib/supabase/server";
 
 export type Workspace = { id: string; name: string; slug: string };
@@ -53,7 +55,7 @@ export async function listMemberships(userId: string): Promise<Membership[]> {
 }
 
 /** Workspace berdasarkan slug, plus apakah user Admin. Null kalau tidak terlihat oleh user. */
-export async function getWorkspace(
+async function getWorkspaceUncached(
   slug: string,
   userId: string,
 ): Promise<{ workspace: Workspace; isAdmin: boolean } | null> {
@@ -90,7 +92,7 @@ export async function listProjects(workspaceId: string): Promise<Project[]> {
   return data as Project[];
 }
 
-export async function getProject(projectId: string): Promise<Project | null> {
+async function getProjectUncached(projectId: string): Promise<Project | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
@@ -208,3 +210,9 @@ export const TIMEZONE_LABEL: Record<string, string> = {
   "Asia/Makassar": "WITA",
   "Asia/Jayapura": "WIT",
 };
+
+/** Dipanggil berkali-kali per request (layout + halaman); hasilnya dibagi lewat cache(). */
+export const getWorkspace = cache(getWorkspaceUncached);
+
+/** Dipanggil berkali-kali per request (layout + halaman); hasilnya dibagi lewat cache(). */
+export const getProject = cache(getProjectUncached);
