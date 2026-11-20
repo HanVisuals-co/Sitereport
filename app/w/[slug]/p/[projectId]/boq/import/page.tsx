@@ -8,6 +8,9 @@ import { getProject, getWorkspace, isUuid } from "@/lib/data";
 
 import { BoqImporter } from "./boq-importer";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "Import BOQ · SiteReport" };
 
 export default async function BoqImportPage(

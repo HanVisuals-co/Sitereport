@@ -25,6 +25,9 @@ import {
 } from "./actions";
 import { InvitePanel } from "./invite-panel";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "Anggota proyek · SiteReport" };
 
 const dateFmt = new Intl.DateTimeFormat("id-ID", {

@@ -7,6 +7,9 @@ import { countBoqItems } from "@/lib/boq/data";
 import { countMembers, getProject, getWorkspace, isUuid, TIMEZONE_LABEL } from "@/lib/data";
 import { countMasterItems } from "@/lib/master/data";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 function formatDate(d: string | null) {
   if (!d) return "—";
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: "UTC" }).format(

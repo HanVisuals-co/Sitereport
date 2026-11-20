@@ -10,6 +10,9 @@ import { listMasterItems, MASTER_KINDS } from "@/lib/master/data";
 import { seedMasterDefaults, setMasterItemActive } from "./actions";
 import { AddMasterForm } from "./add-master-form";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "Daftar master · SiteReport" };
 
 export default async function MasterPage(props: PageProps<"/w/[slug]/p/[projectId]/master">) {

@@ -7,6 +7,9 @@ import { getWorkspace } from "@/lib/data";
 
 import { ProjectForm } from "./project-form";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "Proyek baru · SiteReport" };
 
 export default async function NewProjectPage(props: PageProps<"/w/[slug]/projects/new">) {

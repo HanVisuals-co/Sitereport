@@ -96,7 +96,7 @@ export async function getReport(reportId: string): Promise<ReportDetail | null> 
        labor:report_labor(master_item_id, count),
        equipment:report_equipment(master_item_id, count, hours),
        materials:report_materials(master_item_id, quantity),
-       volumes:report_volumes(boq_item_id, volume, dup_flag, dup_of_report_id, dup_resolution),
+       volumes:report_volumes!report_volumes_report_id_fkey(boq_item_id, volume, dup_flag, dup_of_report_id, dup_resolution),
        photos:report_photos(id, storage_path, source, taken_at, lat, lng, dup_flag, dup_resolution, created_at),
        reviews:report_reviews(id, action, note, created_at,
          reviewer:profiles!report_reviews_reviewer_id_fkey(full_name, email),

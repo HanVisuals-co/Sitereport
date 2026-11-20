@@ -140,6 +140,7 @@ export function ReportForm(props: ReportFormProps) {
   const [localDraft, setLocalDraft] = useState<FormState | null>(null);
   const [photoCount, setPhotoCount] = useState({ uploaded: props.photos.length, pending: 0 });
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [saving, startSaving] = useTransition();
   const [submitting, startSubmitting] = useTransition();
   const dirty = useRef(false);
@@ -176,6 +177,7 @@ export function ReportForm(props: ReportFormProps) {
   const set = (fn: (f: FormState) => FormState) => {
     dirty.current = true;
     setMessage(null);
+    setConfirming(false);
     setForm(fn);
   };
 
@@ -212,13 +214,21 @@ export function ReportForm(props: ReportFormProps) {
     });
   }
 
-  function submit() {
+  /** Cek isian. Kalau lengkap, minta konfirmasi di bar bawah (bukan window.confirm). */
+  function askSubmit() {
     const r = toPayload(form);
     if ("error" in r) return setMessage({ kind: "error", text: r.error });
     if (r.payload.weather.length < 3) return setMessage({ kind: "error", text: "Isi cuaca pagi, siang, dan sore." });
     if (photoCount.pending > 0) return setMessage({ kind: "error", text: "Tunggu semua foto selesai diunggah." });
     if (photoCount.uploaded === 0) return setMessage({ kind: "error", text: "Tambahkan minimal 1 foto." });
-    if (!window.confirm("Kirim laporan ke Pengawas? Setelah dikirim, laporan tidak bisa diubah kecuali diminta revisi.")) return;
+    setMessage(null);
+    setConfirming(true);
+  }
+
+  function submit() {
+    setConfirming(false);
+    const r = toPayload(form);
+    if ("error" in r) return setMessage({ kind: "error", text: r.error });
 
     startSubmitting(async () => {
       const res = await submitReport(slug, projectId, reportId, r.payload);
@@ -234,17 +244,16 @@ export function ReportForm(props: ReportFormProps) {
     });
   }
 
-  async function quickAdd(kind: Kind) {
-    const name = window.prompt(
-      kind === "labor" ? "Nama kategori tenaga kerja baru" : kind === "equipment" ? "Nama alat baru" : "Nama material baru",
-    );
-    if (!name?.trim()) return;
-    const unit =
-      window.prompt("Satuan (opsional)", kind === "labor" ? "orang" : kind === "equipment" ? "unit" : "") ?? "";
+  /** Tambah item master dari form laporan. Mengembalikan true kalau berhasil. */
+  async function quickAdd(kind: Kind, name: string, unit: string): Promise<boolean> {
     const res = await addMasterQuick(slug, projectId, kind, name, unit);
-    if (!res.ok) return setMessage({ kind: "error", text: res.message });
+    if (!res.ok) {
+      setMessage({ kind: "error", text: res.message });
+      return false;
+    }
     setMasters((m) => ({ ...m, [kind]: [...m[kind], res.item].sort((a, b) => a.name.localeCompare(b.name, "id")) }));
     if (kind === "material") set((f) => ({ ...f, materials: [...f.materials, { master_item_id: res.item.id, quantity: "" }] }));
+    return true;
   }
 
   const leafById = useMemo(() => new Map(props.leaves.map((l) => [l.id, l])), [props.leaves]);
@@ -354,7 +363,7 @@ export function ReportForm(props: ReportFormProps) {
             </li>
           ))}
         </ul>
-        <AddButton onClick={() => void quickAdd("labor")}>+ Kategori baru</AddButton>
+        <QuickAdd kind="labor" onAdd={quickAdd}>+ Kategori baru</QuickAdd>
       </Section>
 
       <Section title="Alat" comment={comments.alat}>
@@ -391,7 +400,7 @@ export function ReportForm(props: ReportFormProps) {
             );
           })}
         </ul>
-        <AddButton onClick={() => void quickAdd("equipment")}>+ Alat baru</AddButton>
+        <QuickAdd kind="equipment" onAdd={quickAdd}>+ Alat baru</QuickAdd>
       </Section>
 
       <Section title="Material masuk" comment={comments.material}>
@@ -442,7 +451,7 @@ export function ReportForm(props: ReportFormProps) {
           >
             + Baris material
           </AddButton>
-          <AddButton onClick={() => void quickAdd("material")}>+ Material baru</AddButton>
+          <QuickAdd kind="material" onAdd={quickAdd}>+ Material baru</QuickAdd>
         </div>
       </Section>
 
@@ -529,14 +538,30 @@ export function ReportForm(props: ReportFormProps) {
               </p>
             )
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="secondary" onClick={save} disabled={saving || submitting}>
-              {saving ? "Menyimpan…" : "Simpan draft"}
-            </Button>
-            <Button type="button" onClick={submit} disabled={saving || submitting}>
-              {submitting ? "Mengirim…" : "Kirim ke Pengawas"}
-            </Button>
-          </div>
+          {confirming ? (
+            <>
+              <p className="text-sm font-medium">
+                Kirim laporan ke Pengawas? Setelah dikirim, laporan tidak bisa diubah kecuali diminta revisi.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+                  Batal
+                </Button>
+                <Button type="button" onClick={submit}>
+                  Ya, kirim
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant="secondary" onClick={save} disabled={saving || submitting}>
+                {saving ? "Menyimpan…" : "Simpan draft"}
+              </Button>
+              <Button type="button" onClick={askSubmit} disabled={saving || submitting}>
+                {submitting ? "Mengirim…" : "Kirim ke Pengawas"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -584,6 +609,77 @@ function AddButton({ onClick, children }: { onClick: () => void; children: React
     >
       {children}
     </button>
+  );
+}
+
+const QUICK_ADD_LABEL: Record<Kind, { name: string; unit: string }> = {
+  labor: { name: "Nama kategori tenaga kerja", unit: "orang" },
+  equipment: { name: "Nama alat", unit: "unit" },
+  material: { name: "Nama material", unit: "" },
+};
+
+/** Tombol "+ ... baru" yang membuka isian nama dan satuan di tempat. */
+function QuickAdd({
+  kind,
+  onAdd,
+  children,
+}: {
+  kind: Kind;
+  onAdd: (kind: Kind, name: string, unit: string) => Promise<boolean>;
+  children: ReactNode;
+}) {
+  const label = QUICK_ADD_LABEL[kind];
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState(label.unit);
+  const [pending, startTransition] = useTransition();
+
+  if (!open) return <AddButton onClick={() => setOpen(true)}>{children}</AddButton>;
+
+  function add() {
+    if (!name.trim()) return;
+    startTransition(async () => {
+      if (await onAdd(kind, name.trim(), unit.trim())) {
+        setName("");
+        setUnit(label.unit);
+        setOpen(false);
+      }
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-zinc-300 p-3">
+      <div className="flex gap-2">
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") add();
+            if (e.key === "Escape") setOpen(false);
+          }}
+          placeholder={label.name}
+          aria-label={label.name}
+          className={`${inputCls} min-w-0 flex-1`}
+        />
+        <input
+          value={unit}
+          onChange={(e) => setUnit(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Satuan"
+          aria-label="Satuan"
+          className={`${inputCls} w-24`}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" className="h-10" onClick={add} disabled={pending || !name.trim()}>
+          {pending ? "Menyimpan..." : "Tambah"}
+        </Button>
+        <Button type="button" variant="ghost" className="h-10" onClick={() => setOpen(false)}>
+          Batal
+        </Button>
+      </div>
+    </div>
   );
 }
 

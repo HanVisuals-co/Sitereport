@@ -5,6 +5,9 @@ import { buttonClass } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/session";
 import { getWorkspace, listProjects, TIMEZONE_LABEL } from "@/lib/data";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export default async function WorkspacePage(props: PageProps<"/w/[slug]">) {
   const { slug } = await props.params;
   const user = await requireUser();

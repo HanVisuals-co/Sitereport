@@ -11,6 +11,9 @@ import { formatPeriod, STATUS_CLASS, STATUS_LABEL } from "@/lib/reports/types";
 import { ReportForm } from "./report-form";
 import { ReportView } from "./report-view";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "Laporan harian · SiteReport" };
 
 export default async function ReportPage(

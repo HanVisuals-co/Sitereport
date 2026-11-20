@@ -11,6 +11,9 @@ import { getProject, getWorkspace, isUuid } from "@/lib/data";
 import { clearBoq } from "./actions";
 import { BoqTree } from "./boq-tree";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "BOQ · SiteReport" };
 
 export default async function BoqPage(props: PageProps<"/w/[slug]/p/[projectId]/boq">) {

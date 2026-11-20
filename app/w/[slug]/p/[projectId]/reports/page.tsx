@@ -10,6 +10,9 @@ import { formatPeriod, STATUS_CLASS, STATUS_LABEL } from "@/lib/reports/types";
 
 import { StartReportForm } from "./start-report-form";
 
+// Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
+export const instant = false;
+
 export const metadata: Metadata = { title: "Laporan · SiteReport" };
 
 function addDays(date: string, days: number) {
