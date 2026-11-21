@@ -1,5 +1,6 @@
 import { formatNumber } from "@/lib/format";
 import type { QuickMaster } from "../actions";
+import { DupDecision } from "./review-panel";
 import type { ReportDetail } from "@/lib/reports/data";
 import {
   SECTION_LABEL,
@@ -34,10 +35,13 @@ export function ReportView({
   report,
   masters,
   leaves,
+  reviewIds,
 }: {
   report: ReportDetail;
   masters: Record<"labor" | "equipment" | "material", QuickMaster[]>;
   leaves: BoqLeaf[];
+  /** Diisi kalau user boleh mereview laporan ini: tombol keputusan duplikat muncul. */
+  reviewIds?: { slug: string; projectId: string; reportId: string };
 }) {
   const nameOf = (kind: keyof typeof masters, id: string) =>
     masters[kind].find((m) => m.id === id) ?? { name: "(dihapus)", unit: null };
@@ -140,6 +144,9 @@ export function ReportView({
                         {v.dup_resolution === "duplicate" && " · dinyatakan duplikat"}
                       </p>
                     )}
+                    {v.dup_flag && reviewIds && (
+                      <DupDecision ids={reviewIds} kind="volume" refId={v.boq_item_id} resolution={v.dup_resolution} />
+                    )}
                   </div>
                   <span className="shrink-0 font-medium tabular-nums">
                     {formatNumber(v.volume)} {leaf?.unit ?? ""}
@@ -195,6 +202,11 @@ export function ReportView({
                   </>
                 )}
               </p>
+              {p.dup_flag && reviewIds && (
+                <div className="bg-white px-1.5 pb-1.5">
+                  <DupDecision ids={reviewIds} kind="photo" refId={p.id} resolution={p.dup_resolution} />
+                </div>
+              )}
             </li>
           ))}
         </ul>

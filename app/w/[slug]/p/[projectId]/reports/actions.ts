@@ -1,11 +1,12 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth/session";
 import { getProject, getWorkspace, isUuid } from "@/lib/data";
-import type { DraftPayload } from "@/lib/reports/types";
+import { SECTION_LABEL, type DraftPayload } from "@/lib/reports/types";
 import { createClient } from "@/lib/supabase/server";
 
 /** Anggota proyek di workspace slug. RLS tetap menjadi penjaga utama. */
@@ -107,6 +108,81 @@ export async function submitReport(
   if (error) return { ok: false, message: error.message };
   const result = data as { duplicates: number; over_contract: { name: string }[] };
   return { ok: true, duplicates: result.duplicates, overContract: result.over_contract };
+}
+
+export type ReviewResult = { ok: true } | { ok: false; message: string };
+
+// Peran & status dicek di fungsi DB (assert_reviewer / is_project_admin); di sini hanya validasi input.
+async function reviewRpc(
+  slug: string,
+  projectId: string,
+  reportId: string,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<ReviewResult> {
+  await assertMember(slug, projectId);
+  if (!isUuid(reportId)) return { ok: false, message: "Laporan tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(fn, { p_report_id: reportId, ...args });
+  if (error) return { ok: false, message: error.message };
+  refresh();
+  return { ok: true };
+}
+
+const noteSchema = z.string().max(5000);
+
+export async function resolveDuplicate(
+  slug: string,
+  projectId: string,
+  reportId: string,
+  kind: "volume" | "photo",
+  ref: string,
+  resolution: "valid" | "duplicate",
+): Promise<ReviewResult> {
+  if (!["volume", "photo"].includes(kind) || !isUuid(ref) || !["valid", "duplicate"].includes(resolution)) {
+    return { ok: false, message: "Keputusan tidak valid." };
+  }
+  return reviewRpc(slug, projectId, reportId, "resolve_duplicate", {
+    p_kind: kind,
+    p_ref: ref,
+    p_resolution: resolution,
+  });
+}
+
+export async function approveReport(
+  slug: string,
+  projectId: string,
+  reportId: string,
+  note: string,
+): Promise<ReviewResult> {
+  if (!noteSchema.safeParse(note).success) return { ok: false, message: "Catatan terlalu panjang." };
+  return reviewRpc(slug, projectId, reportId, "approve_report", { p_note: note });
+}
+
+const commentsSchema = z
+  .array(z.object({ section: z.enum(Object.keys(SECTION_LABEL) as [string, ...string[]]), comment: z.string().max(2000) }))
+  .max(20);
+
+export async function requestRevision(
+  slug: string,
+  projectId: string,
+  reportId: string,
+  note: string,
+  comments: { section: string; comment: string }[],
+): Promise<ReviewResult> {
+  const c = commentsSchema.safeParse(comments);
+  if (!noteSchema.safeParse(note).success || !c.success) return { ok: false, message: "Catatan tidak valid." };
+  return reviewRpc(slug, projectId, reportId, "request_revision", { p_note: note, p_comments: c.data });
+}
+
+export async function reopenReport(
+  slug: string,
+  projectId: string,
+  reportId: string,
+  note: string,
+): Promise<ReviewResult> {
+  if (!noteSchema.safeParse(note).success) return { ok: false, message: "Alasan terlalu panjang." };
+  return reviewRpc(slug, projectId, reportId, "reopen_report", { p_note: note });
 }
 
 export type QuickMaster = { id: string; name: string; unit: string | null };

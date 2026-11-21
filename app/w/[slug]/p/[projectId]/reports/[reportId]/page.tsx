@@ -10,6 +10,7 @@ import { formatPeriod, STATUS_CLASS, STATUS_LABEL } from "@/lib/reports/types";
 
 import { ReportForm } from "./report-form";
 import { ReportView } from "./report-view";
+import { ReopenPanel, ReviewPanel } from "./review-panel";
 
 // Halaman ini membaca sesi, jadi navigasinya boleh menunggu server.
 export const instant = false;
@@ -41,6 +42,12 @@ export default async function ReportPage(
     report.author_id === user.id &&
     role === "pelaksana" &&
     (report.status === "draft" || report.status === "revision_requested");
+
+  const canReview =
+    role === "pengawas" && report.author_id !== user.id && report.status === "submitted";
+  const canReopen = ws.isAdmin && report.status === "approved";
+  const ids = { slug, projectId: project.id, reportId: report.id };
+  const flagged = [...report.volumes, ...report.photos].filter((x) => x.dup_flag);
 
   // Daftar master: form hanya menampilkan yang aktif, tampilan baca menampilkan semua (data lama).
   const pick = (kind: "labor" | "equipment" | "material", activeOnly: boolean) =>
@@ -99,7 +106,22 @@ export default async function ReportPage(
           }
         />
       ) : (
-        <ReportView report={report} masters={masters(false)} leaves={leaves} />
+        <>
+          <ReportView
+            report={report}
+            masters={masters(false)}
+            leaves={leaves}
+            reviewIds={canReview ? ids : undefined}
+          />
+          {canReview && (
+            <ReviewPanel
+              ids={ids}
+              unresolved={flagged.filter((x) => x.dup_resolution === null).length}
+              hasDuplicate={flagged.some((x) => x.dup_resolution === "duplicate")}
+            />
+          )}
+          {canReopen && <ReopenPanel ids={ids} />}
+        </>
       )}
     </>
   );
